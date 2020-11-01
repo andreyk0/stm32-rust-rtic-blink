@@ -43,12 +43,12 @@ const APP: () = {
         //hprintln!("clocks").unwrap();
 
         //let mut gpioa = device.GPIOA.split(&mut rcc.apb2);
-        //let mut gpiob = device.GPIOB.split(&mut rcc.apb2);
-        let mut gpioc = device.GPIOC.split(&mut rcc.apb2);
+        let mut gpiob = device.GPIOB.split(&mut rcc.apb2);
+        //let mut gpioc = device.GPIOC.split(&mut rcc.apb2);
 
         //hprintln!("gpio").unwrap();
 
-        let led = gpioc.pc13.into_push_pull_output(&mut gpioc.crh);
+        let led = gpiob.pb1.into_push_pull_output(&mut gpiob.crl);
 
         // Initialize (enable) the monotonic timer (CYCCNT)
         core.DCB.enable_trace();
