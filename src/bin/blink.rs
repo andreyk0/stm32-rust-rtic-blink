@@ -5,7 +5,7 @@
 use panic_halt as _;
 
 use cortex_m::asm;
-use cortex_m_semihosting::hprintln;
+//use cortex_m_semihosting::hprintln;
 
 use stm32f1xx_hal::prelude::*;
 
@@ -40,13 +40,13 @@ const APP: () = {
 
         //assert!(clocks.usbclk_valid());
 
-        hprintln!("clocks").unwrap();
+        //hprintln!("clocks").unwrap();
 
         //let mut gpioa = device.GPIOA.split(&mut rcc.apb2);
         //let mut gpiob = device.GPIOB.split(&mut rcc.apb2);
         let mut gpioc = device.GPIOC.split(&mut rcc.apb2);
 
-        hprintln!("gpio").unwrap();
+        //hprintln!("gpio").unwrap();
 
         let led = gpioc.pc13.into_push_pull_output(&mut gpioc.crh);
 
@@ -58,7 +58,7 @@ const APP: () = {
 
         cx.schedule.blink(cx.start + Duration::from_cycles(SYS_FREQ.0/2)).unwrap();
 
-        hprintln!("init::LateResources").unwrap();
+        //hprintln!("init::LateResources").unwrap();
         init::LateResources {
             led,
         }
