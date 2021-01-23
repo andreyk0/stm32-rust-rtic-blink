@@ -4,7 +4,7 @@ BUILD?=debug
 ELF_TARGET:=target/thumbv7m-none-eabi/$(BUILD)/$(NAME)
 BIN_TARGET:=target/$(NAME).bin
 
-build:
+build: fmt
 	cargo build $(if $(findstring release,$(BUILD)),--release,)
 
 # Requires openocd running
@@ -19,6 +19,9 @@ disassemble: build
 
 doc:
 	cargo doc --open
+
+fmt:
+	find src -type f -name '*.rs' | xargs rustfmt
 
 flash: bin erase
 	st-info --descr

@@ -11,10 +11,7 @@ use stm32f1xx_hal::prelude::*;
 
 use rtic::cyccnt::Duration;
 
-use stm32_rust_rtic_blink::{
-    consts::*,
-    types::*,
-};
+use stm32_rust_rtic_blink::{consts::*, types::*};
 
 #[rtic::app(device = stm32f1xx_hal::stm32,
             peripherals = true,
@@ -56,31 +53,30 @@ const APP: () = {
         cortex_m::peripheral::DWT::unlock();
         core.DWT.enable_cycle_counter();
 
-        cx.schedule.blink(cx.start + Duration::from_cycles(SYS_FREQ.0/2)).unwrap();
+        cx.schedule
+            .blink(cx.start + Duration::from_cycles(SYS_FREQ.0 / 2))
+            .unwrap();
 
         //hprintln!("init::LateResources").unwrap();
-        init::LateResources {
-            led,
-        }
+        init::LateResources { led }
     }
-
 
     #[idle()]
     fn idle(_ctx: idle::Context) -> ! {
-        loop{
+        loop {
             asm::delay(SYS_FREQ.0 / 10000);
         }
     }
-
 
     #[task(resources = [led],
            schedule = [blink],
            priority = 1)]
     fn blink(cx: blink::Context) {
         cx.resources.led.toggle().unwrap();
-        cx.schedule.blink(cx.scheduled + Duration::from_cycles(SYS_FREQ.0/2)).unwrap();
+        cx.schedule
+            .blink(cx.scheduled + Duration::from_cycles(SYS_FREQ.0 / 2))
+            .unwrap();
     }
-
 
     // RTIC requires that unused interrupts are declared in an extern block when
     // using software tasks; these free interrupts will be used to dispatch the
