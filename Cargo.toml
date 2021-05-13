@@ -10,18 +10,18 @@ version = "0.1.0"
 #panic-semihosting = "0.5.3"
 panic-halt = "0.2.0"
 
-cortex-m = "0.6.4"
+cortex-m = "0.7.2"
 cortex-m-rt = "0.6.13"
 cortex-m-semihosting = "0.3.7"
-cortex-m-rtic = "0.5.5"
+cortex-m-rtic = "0.5.6"
 
-embedded-hal = "0.2.4"
+embedded-hal = "0.2.5"
 
 #usb-device = "0.2.5"
 #usbd-serial =  { git = "https://github.com/mvirkkunen/usbd-serial" }
 
 [dependencies.stm32f1]
-version = "0.12.1"
+version = "0.13.0"
 features = ["stm32f103", "rt"]
 
 [dependencies.stm32f1xx-hal]
