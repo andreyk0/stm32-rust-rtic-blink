@@ -4,87 +4,78 @@
 
 use panic_halt as _;
 
-use cortex_m::asm;
-//use cortex_m_semihosting::hprintln;
-
-use stm32f1xx_hal::prelude::*;
-
-use rtic::cyccnt::Duration;
-
-use stm32_rust_rtic_blink::{consts::*, types::*};
-
-#[rtic::app(device = stm32f1xx_hal::stm32,
+#[rtic::app(device = stm32f1::stm32f103,
             peripherals = true,
-            monotonic = rtic::cyccnt::CYCCNT)]
-const APP: () = {
-    struct Resources {
+            dispatchers = [CAN_RX1, CAN_SCE, EXTI4, FSMC, TAMPER], // Full list in  stm32f1::stm32f103::Interrupt
+            )]
+mod app {
+
+    use cortex_m::asm;
+    //use cortex_m_semihosting::hprintln;
+
+    use stm32_rust_rtic_blink::{consts::*, types::*};
+    use stm32f1xx_hal::prelude::*;
+
+    use dwt_systick_monotonic::*;
+
+    #[monotonic(binds = SysTick, default = true)]
+    type MyMono = DwtSystick<SYS_FREQ_HZ>;
+
+    #[shared]
+    struct Shared {
+        //led: LedPin,
+    }
+
+    #[local]
+    struct Local {
         led: LedPin,
     }
 
-    #[init(schedule = [blink])]
-    fn init(cx: init::Context) -> init::LateResources {
-        let mut core: rtic::Peripherals = cx.core;
+    #[init]
+    fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
+        let mut core = cx.core;
         let device = cx.device;
         let mut flash = device.FLASH.constrain();
-        let mut rcc = device.RCC.constrain();
+        let rcc = device.RCC.constrain();
 
         let _clocks = rcc
             .cfgr
-            .use_hse(8.mhz())
+            .use_hse(8u32.MHz())
             .sysclk(SYS_FREQ)
-            .pclk1(36.mhz())
+            .pclk1(36u32.MHz())
             .freeze(&mut flash.acr);
 
         //assert!(clocks.usbclk_valid());
 
-        //hprintln!("clocks").unwrap();
+        //hprintln!("clocks");
 
-        //let mut gpioa = device.GPIOA.split(&mut rcc.apb2);
-        //let mut gpiob = device.GPIOB.split(&mut rcc.apb2);
-        let mut gpioc = device.GPIOC.split(&mut rcc.apb2);
+        let mono = DwtSystick::new(&mut core.DCB, core.DWT, core.SYST, SYS_FREQ.to_Hz());
 
-        //hprintln!("gpio").unwrap();
+        //hprintln!("timer");
+
+        //let mut gpioa = device.GPIOA.split();
+        //let mut gpiob = device.GPIOB.split();
+        let mut gpioc = device.GPIOC.split();
+
+        //hprintln!("gpio");
 
         let led = gpioc.pc13.into_push_pull_output(&mut gpioc.crh);
 
-        // Initialize (enable) the monotonic timer (CYCCNT)
-        core.DCB.enable_trace();
-        // required on Cortex-M7 devices that software lock the DWT (e.g. STM32F7)
-        cortex_m::peripheral::DWT::unlock();
-        core.DWT.enable_cycle_counter();
+        blink::spawn_after(1.secs()).unwrap();
 
-        cx.schedule
-            .blink(cx.start + Duration::from_cycles(SYS_FREQ.0 / 2))
-            .unwrap();
-
-        //hprintln!("init::LateResources").unwrap();
-        init::LateResources { led }
+        (Shared {}, Local { led }, init::Monotonics(mono))
     }
 
     #[idle()]
     fn idle(_ctx: idle::Context) -> ! {
         loop {
-            asm::delay(SYS_FREQ.0 / 10000);
+            asm::delay(SYS_FREQ.to_Hz() / 10000);
         }
     }
 
-    #[task(resources = [led],
-           schedule = [blink],
-           priority = 1)]
+    #[task(local = [led], priority = 1)]
     fn blink(cx: blink::Context) {
-        cx.resources.led.toggle().unwrap();
-        cx.schedule
-            .blink(cx.scheduled + Duration::from_cycles(SYS_FREQ.0 / 2))
-            .unwrap();
+        blink::spawn_at(monotonics::now() + 1.secs()).unwrap();
+        cx.local.led.toggle();
     }
-
-    // RTIC requires that unused interrupts are declared in an extern block when
-    // using software tasks; these free interrupts will be used to dispatch the
-    // software tasks.
-    // Full list in  stm32f1::stm32f103::Interrupt
-    extern "C" {
-        fn EXTI4();
-        fn FSMC();
-        fn TAMPER();
-    }
-};
+}
