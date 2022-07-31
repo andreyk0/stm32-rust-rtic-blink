@@ -1,81 +1,78 @@
 #![deny(unsafe_code)]
-#![cfg_attr(not(doc), no_main)]
+#![no_main]
 #![no_std]
 
-use panic_halt as _;
+use fugit::RateExtU32;
+use panic_rtt_target as _;
+use rtic::app;
+use rtt_target::{rprintln, rtt_init_print};
+use stm32f1xx_hal::gpio::PinState;
+use stm32f1xx_hal::prelude::*;
+use systick_monotonic::{fugit::Duration, Systick};
 
-#[rtic::app(device = stm32f1::stm32f103,
-            peripherals = true,
-            dispatchers = [CAN_RX1, CAN_SCE, EXTI4, FSMC, TAMPER], // Full list in  stm32f1::stm32f103::Interrupt
-            )]
+use stm32_rust_rtic_blink::consts::*;
+use stm32_rust_rtic_blink::types::*;
+
+#[app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [SPI1])]
 mod app {
-
-    use cortex_m::asm;
-    //use cortex_m_semihosting::hprintln;
-
-    use stm32_rust_rtic_blink::{consts::*, types::*};
-    use stm32f1xx_hal::prelude::*;
-
-    use dwt_systick_monotonic::*;
-
-    #[monotonic(binds = SysTick, default = true)]
-    type MyMono = DwtSystick<SYS_FREQ_HZ>;
+    use super::*;
 
     #[shared]
-    struct Shared {
-        //led: LedPin,
-    }
+    struct Shared {}
 
     #[local]
     struct Local {
         led: LedPin,
+        state: bool,
     }
+
+    #[monotonic(binds = SysTick, default = true)]
+    type MonoTimer = Systick<1000>;
 
     #[init]
     fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
-        let mut core = cx.core;
-        let device = cx.device;
-        let mut flash = device.FLASH.constrain();
-        let rcc = device.RCC.constrain();
+        // Setup clocks
+        let mut flash = cx.device.FLASH.constrain();
+        let rcc = cx.device.RCC.constrain();
+
+        let mono = Systick::new(cx.core.SYST, 36_000_000);
+
+        rtt_init_print!();
+        rprintln!("init");
 
         let _clocks = rcc
             .cfgr
-            .use_hse(8u32.MHz())
+            .use_hse(8.MHz())
             .sysclk(SYS_FREQ)
-            .pclk1(36u32.MHz())
+            .pclk1(36.MHz())
             .freeze(&mut flash.acr);
 
-        //assert!(clocks.usbclk_valid());
+        // Setup LED
+        let mut gpioc = cx.device.GPIOC.split();
+        let led = gpioc
+            .pc13
+            .into_push_pull_output_with_state(&mut gpioc.crh, PinState::Low);
 
-        //hprintln!("clocks");
+        // Schedule the blinking task
+        blink::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
 
-        let mono = DwtSystick::new(&mut core.DCB, core.DWT, core.SYST, SYS_FREQ.to_Hz());
-
-        //hprintln!("timer");
-
-        //let mut gpioa = device.GPIOA.split();
-        //let mut gpiob = device.GPIOB.split();
-        let mut gpioc = device.GPIOC.split();
-
-        //hprintln!("gpio");
-
-        let led = gpioc.pc13.into_push_pull_output(&mut gpioc.crh);
-
-        blink::spawn_after(1.secs()).unwrap();
-
-        (Shared {}, Local { led }, init::Monotonics(mono))
+        (
+            Shared {},
+            Local { led, state: false },
+            init::Monotonics(mono),
+        )
     }
 
-    #[idle()]
-    fn idle(_ctx: idle::Context) -> ! {
-        loop {
-            asm::delay(SYS_FREQ.to_Hz() / 10000);
-        }
-    }
-
-    #[task(local = [led], priority = 1)]
+    #[task(local = [led, state])]
     fn blink(cx: blink::Context) {
-        blink::spawn_at(monotonics::now() + 1.secs()).unwrap();
-        cx.local.led.toggle();
+        rprintln!("blink");
+        if *cx.local.state {
+            cx.local.led.set_high();
+            *cx.local.state = false;
+        } else {
+            cx.local.led.set_low();
+            *cx.local.state = true;
+        }
+        blink::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
     }
 }
