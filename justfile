@@ -32,8 +32,18 @@ flash: bin erase
 erase:
 	st-flash erase
 
+# Empties target/ but keeps it a btrfs subvolume, so fs snapshots skip build output.
+# `cargo clean` would delete the subvolume, and the next build would recreate a plain directory.
 clean:
-	cargo clean
+	#!/usr/bin/env bash
+	set -euo pipefail
+	# A btrfs subvolume root always has inode 256.
+	if [[ -e target && "$(stat -c %i target)" == 256 ]]; then
+		find target -mindepth 1 -delete
+	else
+		rm -rf target
+		btrfs subvolume create target
+	fi
 
 picocom:
 	picocom -b 115200 --imap lfcrlf /dev/ttyACM0
